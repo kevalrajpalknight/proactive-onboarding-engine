@@ -1,0 +1,41 @@
+:root {
+  /* Brand palette */
+  --color-deep-navy: #0F2854;
+  --color-royal-blue: #1C4D8D;
+  --color-sky-blue: #4988c4;
+  --color-light-blue: #BDE8F5;
+  --color-off-white: #FAFAFA;
+
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-deep-navy);
+  color: var(--color-off-white);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
