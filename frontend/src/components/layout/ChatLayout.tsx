@@ -1,4 +1,4 @@
-import type { Conversation, Message } from '../../types/chat'
+import type { Conversation, CourseRoadmap, Message } from '../../types/chat'
 import { ChatWindow } from '../chat/ChatWindow'
 import { MessageInput } from '../chat/MessageInput'
 import { Sidebar } from '../chat/Sidebar'
@@ -10,6 +10,7 @@ interface ChatLayoutProps {
   messages: Message[]
   onSendMessage: (text: string) => void
   isBotTyping: boolean
+  onOpenCourse: (course: CourseRoadmap) => void
 }
 
 export function ChatLayout({
@@ -19,6 +20,7 @@ export function ChatLayout({
   messages,
   onSendMessage,
   isBotTyping,
+  onOpenCourse,
 }: ChatLayoutProps) {
   return (
     <div className="chat-app-shell">
@@ -38,7 +40,11 @@ export function ChatLayout({
         </header>
         <main className="chat-main-body">
           <div className="chat-messages">
-            <ChatWindow messages={messages} isBotTyping={isBotTyping} />
+            <ChatWindow
+              messages={messages}
+              isBotTyping={isBotTyping}
+              onOpenCourse={onOpenCourse}
+            />
           </div>
         </main>
         <footer className="chat-footer">

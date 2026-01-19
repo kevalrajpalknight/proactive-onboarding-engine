@@ -1,11 +1,28 @@
-import type { Message } from '../../types/chat'
+import type { CourseRoadmap, Message, QuestionOption } from '../../types/chat'
 
 interface ChatWindowProps {
   messages: Message[]
   isBotTyping: boolean
+  onOpenCourse?: (course: CourseRoadmap) => void
 }
 
-export function ChatWindow({ messages, isBotTyping }: ChatWindowProps) {
+function renderQuestionOptions(options: QuestionOption[] | null | undefined) {
+  if (!options || options.length === 0) return null
+
+  const sorted = [...options].sort((a, b) => a.orderIndex - b.orderIndex)
+
+  return (
+    <div className="chat-question-options">
+      {sorted.map((option) => (
+        <div key={option.optionValue} className="chat-question-option">
+          {option.optionText}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function ChatWindow({ messages, isBotTyping, onOpenCourse }: ChatWindowProps) {
   return (
     <>
       {messages.map((message) => {
@@ -21,7 +38,53 @@ export function ChatWindow({ messages, isBotTyping }: ChatWindowProps) {
               </div>
             )}
                 <div className={`chat-message-bubble ${isUser ? 'user' : 'bot'}`}>
-                  <div>{message.text}</div>
+                  <div className="chat-message-body">
+                    {/* Primary text / description */}
+                    <div>{message.text}</div>
+
+                    {/* Question metadata (for AI knowledge-check prompts) */}
+                    {message.type === 'question' && message.questionText && (
+                      <div className="chat-question-block">
+                        <div className="chat-question-text">{message.questionText}</div>
+                        {renderQuestionOptions(message.options)}
+                        {message.responseRequired && (
+                          <div className="chat-question-hint">Response required – answer in the chat box.</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tailored course card, rendered when a roadmap is attached */}
+                    {message.courseRoadmap && (
+                      <button
+                        type="button"
+                        className="chat-course-card"
+                        onClick={() => onOpenCourse?.(message.courseRoadmap as CourseRoadmap)}
+                      >
+                        <div className="chat-course-card-header">
+                          <div className="chat-course-card-title">
+                            {message.courseRoadmap.title}
+                          </div>
+                          <div className="chat-course-card-level">
+                            {message.courseRoadmap.level.toUpperCase()}
+                          </div>
+                        </div>
+                        <div className="chat-course-card-body">
+                          <div className="chat-course-card-objective">
+                            {message.courseRoadmap.objective}
+                          </div>
+                          <div className="chat-course-card-description">
+                            {message.courseRoadmap.description}
+                          </div>
+                        </div>
+                        {message.courseRoadmap.totalEstimatedDuration && (
+                          <div className="chat-course-card-meta">
+                            Estimated duration: {message.courseRoadmap.totalEstimatedDuration}
+                          </div>
+                        )}
+                        <div className="chat-course-card-cta">Open tailored roadmap</div>
+                      </button>
+                    )}
+                  </div>
                   <div className="chat-message-meta">
                     {isUser ? 'You' : 'Assistant'}  • {message.timestamp}
                   </div>
