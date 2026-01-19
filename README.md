@@ -4,7 +4,11 @@
 
 **Proactive Onboarding Engine (POE)** uses agentic RAG to automate personalized learning paths. By synthesizing internal documentation with external insights, it minimizes ramp-up time tailored to your role and prior knowledge. Focus on high-impact work while POE handles your curriculum. Accelerate your productivity and hit the ground running.
 
-<img src="./docs/assets/ui-screenshot.png" alt="UI Screenshot for chatbot" />
+<img src="./docs/assets/chatwindow-ui-screenshot.png" alt="UI Screenshot for chatbot" />
+
+---
+
+<img src="./docs/assets/roadmap-ui-screenshot.png" alt="UI Screenshot for chatbot" />
 
 ## ✨ Key Features
 
