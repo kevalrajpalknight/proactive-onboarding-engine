@@ -24,4 +24,7 @@ dependencies = [
     "structlog>=25.5.0",
     "google-api-python-client>=2.188.0",
     "ddgs>=9.10.0",
+    "alembic>=1.18.0",
+    "sqlalchemy>=2.0.45",
+    "pwdlib[argon2]>=0.3.0",
 ]
