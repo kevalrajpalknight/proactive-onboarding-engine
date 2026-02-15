@@ -55,7 +55,7 @@ class AIService:
     async def get_chat_title(initial_message: str) -> str:
         prompt_template = """
         Given the user's initial message: "{initial_message}", generate a concise and relevant title for the chat session that reflects the main topic or purpose of the conversation.
-
+        {format_instructions}
         Title:
         """
 
@@ -69,7 +69,7 @@ class AIService:
         )
 
         result = await chain.arun({"initial_message": initial_message})
-        return result.title
+        return result["title"]
 
     async def generate_clarifying_question(
         self,
@@ -85,7 +85,7 @@ class AIService:
 
         User Message:
         {user_message}
-
+        {format_instructions}
         Based on the above chat history and user message, generate a single clarifying question to better understand the user's needs.
         """
         )
@@ -110,4 +110,4 @@ class AIService:
                 "session_id": session_id,
             }
         )
-        return result.question if not result.completed else None
+        return result["question"] if not result["completed"] else None

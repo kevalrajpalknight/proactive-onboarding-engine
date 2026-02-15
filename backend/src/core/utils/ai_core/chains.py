@@ -16,7 +16,9 @@ class PydancticLLMChain:
         api_key: Optional[str] = None,
         partial_variables: Optional[Dict[str, Any]] = None,
     ) -> None:
-        self.parser = JsonOutputParser(pydantic_model)
+        self.parser = JsonOutputParser(
+            pydantic_object=pydantic_model,
+        )
         self.prompt = PromptTemplate(
             template=prompt_template,
             input_variables=[var["name"] for var in input_variables],
