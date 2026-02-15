@@ -1,9 +1,9 @@
 import json
 from typing import List, TypedDict
 
-from agents.planner import planner_agent
-from agents.researcher import researcher_agent
-from utils.output_parser import get_structured_output_parser
+from .agents.planner import planner_agent
+from .agents.researcher import researcher_agent
+from .utils.output_parser import get_structured_output_parser
 
 
 class UserProfile(TypedDict):

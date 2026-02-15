@@ -10,6 +10,7 @@ from .models import ChatStatus
 from .schema import (
     ChatHistoryResponse,
     ChatInteractionResponse,
+    GenerateRoadmapResponse,
     QuestionnaireQuestionSchema,
     UserQuerySchema,
 )
@@ -233,4 +234,55 @@ async def get_chat_history(
         title=chat.title,
         status=chat.status,
         history=history,
+    )
+
+
+@router.post("/{session_id}/generate-roadmap", response_model=GenerateRoadmapResponse)
+async def generate_roadmap(
+    session_id: UUID,
+    db_session: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Trigger roadmap curation for a completed chat session.
+
+    The actual work runs as an ``asyncio`` background task that publishes
+    progress via Redis pub/sub.  The client should open a WebSocket to
+    ``/ws/roadmap/{session_id}`` to receive live updates.
+    """
+    import asyncio
+
+    from ..engine.entrypoint import curate_roadmap
+
+    chat = await ChatService.get_chat_by_id(db_session, session_id)
+    if chat is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
+        )
+
+    if chat.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this chat",
+        )
+
+    if chat.status != ChatStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chat is not completed yet. Cannot generate roadmap.",
+        )
+
+    chat_data = {
+        "title": chat.title,
+        "initial_message": chat.initial_message,
+        "question_answers": chat.question_answers or [],
+    }
+
+    # Fire-and-forget background task
+    asyncio.create_task(curate_roadmap(str(session_id), chat_data))
+
+    return GenerateRoadmapResponse(
+        session_id=chat.id,
+        status="pending",
+        message="Roadmap generation started. Connect to the WebSocket for live progress.",
     )

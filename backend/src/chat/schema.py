@@ -163,3 +163,16 @@ class ChatHistoryResponse(BaseModel):
         default_factory=list,
         description="Ordered chat turns with question and answer",
     )
+
+
+class GenerateRoadmapResponse(BaseModel):
+    """Response returned when roadmap generation is triggered."""
+
+    session_id: UUID = Field(..., description="Chat session identifier")
+    status: str = Field(
+        ...,
+        description="Current status of roadmap generation (pending, in_progress, completed, error)",
+    )
+    message: str = Field(
+        ..., description="Human-readable message about the generation status"
+    )

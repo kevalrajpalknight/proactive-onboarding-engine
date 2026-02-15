@@ -27,4 +27,5 @@ dependencies = [
     "alembic>=1.18.0",
     "sqlalchemy>=2.0.45",
     "pwdlib[argon2]>=0.3.0",
+    "redis>=5.0.0",
 ]
