@@ -40,6 +40,11 @@ async def chat_interaction(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Message is required to interact with the chat",
         )
+    if user_query.message and len(user_query.message) > 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Message must be 500 characters or fewer",
+        )
     if user_query.session_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
