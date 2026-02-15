@@ -4,6 +4,7 @@ import src.models  # noqa: F401
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from src.chat import routers as chat_router
 from src.core.config import settings
 from src.core.exceptions import setup_exception_handlers
 from src.users import routers as user_router
@@ -50,5 +51,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API router
+# Include API routers
 app.include_router(user_router.router)
+app.include_router(chat_router.router)

@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # External API keys
     openai_model_name: str = "gpt-4"
     youtube_api_key: str = "YOUR_YOUTUBE_API_KEY"
-    open_api_key: str = "YOUR_OPENAI_API_KEY"
+    openai_api_key: str = "YOUR_OPENAI_API_KEY"
 
     class Config:
         env_file = ".env"
