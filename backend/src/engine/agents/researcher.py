@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from ..models.llm import llm
 from ..prompts.research_prompt import get_research_prompt
 from ..tools.ddgs import search
-from ..tools.youtube import search_youtube_videos
 
 
 class ResourceType(str, Enum):
@@ -37,7 +36,7 @@ RESEARCH_PROMPT = get_research_prompt()
 agent = create_deep_agent(
     name="researcher-agent",
     model=llm,
-    tools=[search, search_youtube_videos],
+    tools=[search],
     system_prompt=RESEARCH_PROMPT,
     response_format=ToolStrategy(ResearchReportFormat),
 )
