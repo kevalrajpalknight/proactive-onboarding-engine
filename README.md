@@ -10,6 +10,12 @@
 
 <img src="./docs/assets/roadmap-ui-screenshot.png" alt="UI Screenshot for chatbot" />
 
+---
+
+<img src="./docs/assets/chatwindow-with-questions.png" alt="UI screenshot with AI Generate Questions" >
+
+---
+
 ## ✨ Key Features
 
 - **Proactive Curriculum Generation:** No more waiting for a mentor. POE builds your 30-day plan the moment you join.

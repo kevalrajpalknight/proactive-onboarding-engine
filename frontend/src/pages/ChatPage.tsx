@@ -1,181 +1,288 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChatLayout } from '../components/layout/ChatLayout'
-import type { Conversation, CourseRoadmap, Message } from '../types/chat'
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ChatLayout } from "../components/layout/ChatLayout";
+import { useAuth } from "../contexts/AuthContext";
+import * as api from "../services/api";
+import type { Conversation, CourseRoadmap, Message } from "../types/chat";
 
-const initialConversations: Conversation[] = [
-  {
-    id: 'welcome',
-    title: 'Welcome to onboarding',
-    messages: [
-      {
-        id: 'welcome-1',
-        sender: 'bot',
-        text: "Hi, I'm your onboarding assistant. Ask me anything about this project, the stack, or how things work.",
-        timestamp: 'Just now',
-      },
-    ],
-  },
-  {
-    id: 'architecture',
-    title: 'Project architecture',
-    messages: [],
-  },
-]
+// ---------------------------------------------------------------------------
+// Local session tracking
+// ---------------------------------------------------------------------------
+const SESSIONS_KEY = "poe_chat_sessions";
 
-export function ChatPage() {
-  const navigate = useNavigate()
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
-  const [activeConversationId, setActiveConversationId] = useState<string>(
-    initialConversations[0]?.id ?? 'welcome',
-  )
-  const [isBotTyping, setIsBotTyping] = useState(false)
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  completed: boolean;
+}
 
-  const activeConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === activeConversationId),
-    [conversations, activeConversationId],
-  )
-
-  const handleSelectConversation = (id: string) => {
-    setActiveConversationId(id)
+function loadSessions(): ChatSession[] {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
+}
 
-  const handleSendMessage = (text: string) => {
-    if (!activeConversation) return
+function persistSessions(sessions: ChatSession[]) {
+  // Only persist lightweight metadata – messages are reloaded from the API
+  const lite = sessions.map((s) => ({
+    id: s.id,
+    title: s.title,
+    completed: s.completed,
+    messages: [] as Message[],
+  }));
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(lite));
+}
 
-    const conversationId = activeConversation.id
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+/** Convert the backend's Q/A history into a flat list of chat messages. */
+function historyToMessages(history: api.ChatHistoryItem[]): Message[] {
+  const msgs: Message[] = [];
+  for (const item of history) {
+    msgs.push({
+      id: `q-${item.order}`,
+      sender: "bot",
+      text: item.question,
+      timestamp: "",
+      type: "question",
+      questionType:
+        (item.question_type as Message["questionType"]) ?? undefined,
+      options:
+        item.options?.map((opt, idx) => ({
+          optionText: opt,
+          optionValue: opt,
+          orderIndex: idx,
+        })) ?? undefined,
+    });
+    if (item.answer) {
+      msgs.push({
+        id: `a-${item.order}`,
+        sender: "user",
+        text: item.answer,
+        timestamp: "",
+      });
+    }
+  }
+  return msgs;
+}
 
-    // Add user message to the active conversation
-    setConversations((previous) =>
-      previous.map((conversation) =>
-        conversation.id === conversationId
-          ? {
-              ...conversation,
-              messages: [
-                ...conversation.messages,
-                {
-                  id: `user-${Date.now()}`,
-                  sender: 'user',
-                  text,
-                  timestamp,
-                },
-              ],
-            }
-          : conversation,
-      ),
-    )
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+export function ChatPage() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
-    // Simulate the bot typing and then responding
-    setIsBotTyping(true)
+  const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    () => loadSessions()[0]?.id ?? null,
+  );
+  const [isBotTyping, setIsBotTyping] = useState(false);
 
-    const simulatedReply =
-      "Sure, I can help with that! Can you please provide more details about your existing knowledge by answering a few questions? This will help me tailor the information to your needs."
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.id === activeSessionId) ?? null,
+    [sessions, activeSessionId],
+  );
 
-    setTimeout(() => {
-      const replyTimestamp = new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
+  // Persist lightweight session list whenever it changes
+  useEffect(() => {
+    persistSessions(sessions);
+  }, [sessions]);
+
+  // Load full history from API when switching to a session whose messages
+  // haven't been fetched yet.
+  useEffect(() => {
+    if (!activeSession || activeSession.messages.length > 0) return;
+
+    let cancelled = false;
+    api
+      .getChatHistory(activeSession.id)
+      .then((res) => {
+        if (cancelled) return;
+        const messages = historyToMessages(res.history);
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === activeSession.id
+              ? {
+                  ...s,
+                  messages,
+                  title: res.title || s.title,
+                  completed: res.status === "completed",
+                }
+              : s,
+          ),
+        );
       })
+      .catch(() => {
+        // Session might not exist on the server yet (brand-new chat)
+      });
 
-      const courseRoadmap: CourseRoadmap = {
-        id: `course-${Date.now()}`,
-        title: 'Tailored onboarding roadmap',
-        objective: 'Get you productive and confident with this project stack.',
-        description:
-          'Based on your answers, here is a step-by-step learning path covering architecture, tools, and workflows used in this codebase.',
-        level: 'beginner',
-        totalEstimatedDuration: '1-2 weeks (part-time)',
-        sections: [
-          {
-            id: 'foundations',
-            title: 'Project foundations',
-            description: 'Understand the overall architecture and key services.',
-            topics: [
-              {
-                id: 'readme-tour',
-                title: 'Walk through the main README and docs',
-                description: 'Identify entry points, domains, and workflows.',
-                status: 'not_started',
-                estimatedDuration: '30 min',
-              },
-              {
-                id: 'backend-overview',
-                title: 'Backend architecture overview',
-                description: 'Review main services, modules, and dependencies.',
-                status: 'in_progress',
-                estimatedDuration: '1 hr',
-              },
-            ],
-          },
-          {
-            id: 'hands-on',
-            title: 'Hands-on workflows',
-            description: 'Run the stack locally and ship a small change.',
-            topics: [
-              {
-                id: 'run-locally',
-                title: 'Run the app locally (frontend + backend)',
-                status: 'completed',
-                estimatedDuration: '1-2 hr',
-              },
-              {
-                id: 'first-change',
-                title: 'Implement and ship a small feature or bugfix',
-                status: 'not_started',
-                estimatedDuration: '2-3 hrs',
-              },
-            ],
-          },
-        ],
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession?.id]);
+
+  // --- handlers ---
+
+  const handleNewChat = useCallback(() => {
+    const id = crypto.randomUUID();
+    const session: ChatSession = {
+      id,
+      title: "New conversation",
+      messages: [],
+      completed: false,
+    };
+    setSessions((prev) => [session, ...prev]);
+    setActiveSessionId(id);
+  }, []);
+
+  const handleSelectConversation = useCallback((id: string) => {
+    setActiveSessionId(id);
+  }, []);
+
+  const handleSendMessage = useCallback(
+    async (text: string) => {
+      // Auto-create a session when the user sends a message without one
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        const id = crypto.randomUUID();
+        const session: ChatSession = {
+          id,
+          title: "New conversation",
+          messages: [],
+          completed: false,
+        };
+        setSessions((prev) => [session, ...prev]);
+        setActiveSessionId(id);
+        sessionId = id;
       }
 
-      const botMessages: Message[] = [
-        {
-          id: `bot-${Date.now()}-intro`,
-          sender: 'bot',
-          text: simulatedReply,
-          timestamp: replyTimestamp,
-          type: 'information',
-        },
-        {
-          id: `bot-${Date.now()}-course`,
-          sender: 'bot',
-          text: 'I have prepared a tailored onboarding course for you. Open it to see your roadmap.',
-          timestamp: replyTimestamp,
-          type: 'information',
-          courseRoadmap,
-        },
-      ]
+      const timestamp = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-      setConversations((previous) =>
-        previous.map((conversation) =>
-          conversation.id === conversationId
-            ? {
-                ...conversation,
-                messages: [...conversation.messages, ...botMessages],
-              }
-            : conversation,
+      // Optimistically add user message
+      const userMsg: Message = {
+        id: `user-${Date.now()}`,
+        sender: "user",
+        text,
+        timestamp,
+      };
+
+      const isFirstMessage = (activeSession?.messages.length ?? 0) === 0;
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, messages: [...s.messages, userMsg] } : s,
         ),
-      )
+      );
 
-      setIsBotTyping(false)
-    }, 900)
-  }
+      setIsBotTyping(true);
 
-  const handleOpenCourse = (course: CourseRoadmap) => {
-    navigate(`/roadmap/${course.id}`, { state: { course } })
-  }
+      try {
+        const response = await api.chatInteraction({
+          session_id: sessionId,
+          message: text,
+        });
+
+        const replyTs = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const botMsg: Message = {
+          id: `bot-${Date.now()}`,
+          sender: "bot",
+          text:
+            response.question ??
+            "Thank you for completing the onboarding questionnaire!",
+          timestamp: replyTs,
+          type: "question",
+          questionType:
+            (response.question_type as Message["questionType"]) ?? undefined,
+          options:
+            response.options?.map((opt, idx) => ({
+              optionText: opt,
+              optionValue: opt,
+              orderIndex: idx,
+            })) ?? undefined,
+        };
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId
+              ? {
+                  ...s,
+                  title: isFirstMessage ? text.slice(0, 60) : s.title,
+                  messages: [...s.messages, botMsg],
+                  completed: response.completed,
+                }
+              : s,
+          ),
+        );
+      } catch (err) {
+        if (err instanceof api.ApiError && err.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+
+        const errorMsg: Message = {
+          id: `error-${Date.now()}`,
+          sender: "bot",
+          text:
+            err instanceof api.ApiError
+              ? err.message
+              : "Something went wrong. Please try again.",
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        };
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, errorMsg] }
+              : s,
+          ),
+        );
+      } finally {
+        setIsBotTyping(false);
+      }
+    },
+    [activeSessionId, activeSession, logout, navigate],
+  );
+
+  const handleOpenCourse = useCallback(
+    (course: CourseRoadmap) => {
+      navigate(`/roadmap/${course.id}`, { state: { course } });
+    },
+    [navigate],
+  );
+
+  // Map sessions → Conversation[] for the sidebar
+  const conversations: Conversation[] = sessions.map((s) => ({
+    id: s.id,
+    title: s.title,
+    messages: s.messages,
+  }));
 
   return (
     <ChatLayout
       conversations={conversations}
-      activeConversationId={activeConversationId}
+      activeConversationId={activeSessionId ?? ""}
       onSelectConversation={handleSelectConversation}
-      messages={activeConversation?.messages ?? []}
+      messages={activeSession?.messages ?? []}
       onSendMessage={handleSendMessage}
       isBotTyping={isBotTyping}
       onOpenCourse={handleOpenCourse}
+      onNewChat={handleNewChat}
+      onLogout={logout}
     />
-  )
+  );
 }

@@ -1,16 +1,18 @@
-import type { Conversation, CourseRoadmap, Message } from '../../types/chat'
-import { ChatWindow } from '../chat/ChatWindow'
-import { MessageInput } from '../chat/MessageInput'
-import { Sidebar } from '../chat/Sidebar'
+import type { Conversation, CourseRoadmap, Message } from "../../types/chat";
+import { ChatWindow } from "../chat/ChatWindow";
+import { MessageInput } from "../chat/MessageInput";
+import { Sidebar } from "../chat/Sidebar";
 
 interface ChatLayoutProps {
-  conversations: Conversation[]
-  activeConversationId: string
-  onSelectConversation: (id: string) => void
-  messages: Message[]
-  onSendMessage: (text: string) => void
-  isBotTyping: boolean
-  onOpenCourse: (course: CourseRoadmap) => void
+  conversations: Conversation[];
+  activeConversationId: string;
+  onSelectConversation: (id: string) => void;
+  messages: Message[];
+  onSendMessage: (text: string) => void;
+  isBotTyping: boolean;
+  onOpenCourse: (course: CourseRoadmap) => void;
+  onNewChat?: () => void;
+  onLogout?: () => void;
 }
 
 export function ChatLayout({
@@ -21,6 +23,8 @@ export function ChatLayout({
   onSendMessage,
   isBotTyping,
   onOpenCourse,
+  onNewChat,
+  onLogout,
 }: ChatLayoutProps) {
   return (
     <div className="chat-app-shell">
@@ -28,11 +32,15 @@ export function ChatLayout({
         conversations={conversations}
         activeConversationId={activeConversationId}
         onSelectConversation={onSelectConversation}
+        onNewChat={onNewChat}
+        onLogout={onLogout}
       />
       <div className="chat-main">
         <header className="chat-main-header">
           <div className="chat-main-title-block">
-            <span className="chat-main-title">Proactive Onboarding Assistant</span>
+            <span className="chat-main-title">
+              Proactive Onboarding Assistant
+            </span>
             <span className="chat-main-status">
               Smart research agent to assist your onboarding
             </span>
@@ -52,5 +60,5 @@ export function ChatLayout({
         </footer>
       </div>
     </div>
-  )
+  );
 }

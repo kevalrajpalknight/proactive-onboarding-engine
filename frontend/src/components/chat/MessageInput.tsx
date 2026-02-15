@@ -1,21 +1,31 @@
-import { SendIcon } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { SendIcon } from "lucide-react";
+import { type FormEvent, useState } from "react";
 
 interface MessageInputProps {
-  onSend: (text: string) => void
-  isSending: boolean
+  onSend: (text: string) => void;
+  isSending: boolean;
 }
 
 export function MessageInput({ onSend, isSending }: MessageInputProps) {
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState("");
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const trimmed = value.trim()
-    if (!trimmed || isSending) return
-    onSend(trimmed)
-    setValue('')
-  }
+    event.preventDefault();
+    const trimmed = value.trim();
+    if (!trimmed || isSending) return;
+    onSend(trimmed);
+    setValue("");
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const trimmed = value.trim();
+      if (!trimmed || isSending) return;
+      onSend(trimmed);
+      setValue("");
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} autoComplete="off">
@@ -26,6 +36,7 @@ export function MessageInput({ onSend, isSending }: MessageInputProps) {
           placeholder="Ask anything to get onboarded faster..."
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onKeyDown={handleKeyDown}
         />
         <button
           type="submit"
@@ -35,9 +46,9 @@ export function MessageInput({ onSend, isSending }: MessageInputProps) {
           <span className="chat-send-button-icon" aria-hidden="true">
             <SendIcon />
           </span>
-          <span>{isSending ? 'Sending' : 'Send'}</span>
+          <span>{isSending ? "Sending" : "Send"}</span>
         </button>
       </div>
     </form>
-  )
+  );
 }
