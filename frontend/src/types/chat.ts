@@ -27,6 +27,7 @@ export interface RoadmapTopic {
   description?: string;
   status: "not_started" | "in_progress" | "completed";
   estimatedDuration?: string; // e.g. "30 min", "2 days"
+  links?: string[]; // Optional list of resource links for the topic
 }
 
 export interface RoadmapSection {

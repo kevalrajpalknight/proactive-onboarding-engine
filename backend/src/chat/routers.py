@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -249,10 +250,6 @@ async def generate_roadmap(
     progress via Redis pub/sub.  The client should open a WebSocket to
     ``/ws/roadmap/{session_id}`` to receive live updates.
     """
-    import asyncio
-
-    from ..engine.entrypoint import curate_roadmap
-
     chat = await ChatService.get_chat_by_id(db_session, session_id)
     if chat is None:
         raise HTTPException(
@@ -278,8 +275,12 @@ async def generate_roadmap(
         "question_answers": chat.question_answers or [],
     }
 
-    # Fire-and-forget background task
-    asyncio.create_task(curate_roadmap(str(session_id), chat_data))
+    # Fire background task with proper tracking
+    from ..engine.entrypoint import _running_tasks, curate_roadmap
+
+    task = asyncio.create_task(curate_roadmap(str(session_id), chat_data))
+    _running_tasks.add(task)
+    task.add_done_callback(_running_tasks.discard)
 
     return GenerateRoadmapResponse(
         session_id=chat.id,

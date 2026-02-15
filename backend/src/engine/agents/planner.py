@@ -21,7 +21,6 @@ class ToDoListResponseFormat(BaseModel):
 
 
 PLANNER_PROMPT = get_planner_prompt()
-print("Planner Prompt Loaded:", PLANNER_PROMPT)
 agent = create_deep_agent(
     name="proactive-onboarding-engine",
     model=llm,

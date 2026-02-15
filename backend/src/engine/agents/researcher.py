@@ -33,7 +33,6 @@ class ResearchReportFormat(BaseModel):
 
 
 RESEARCH_PROMPT = get_research_prompt()
-print("Research Prompt Loaded:", RESEARCH_PROMPT)
 
 agent = create_deep_agent(
     name="researcher-agent",

@@ -1,3 +1,4 @@
+import { Globe } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -39,6 +40,7 @@ interface TopicNodeData {
   label: string;
   description?: string;
   duration?: string;
+  links?: string[];
   status: "not_started" | "in_progress" | "completed";
 }
 
@@ -85,6 +87,23 @@ function TopicNode({ data }: NodeProps<TopicNodeData>) {
         </div>
       )}
       {data.duration && <div className="rf-card-meta">{data.duration}</div>}
+      {data.links && data.links.length > 0 && (
+        <div
+          className="rf-card-links"
+          style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}
+        >
+          {data.links.map((link, index) => (
+            <a
+              key={index}
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Globe />
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -153,6 +172,7 @@ function buildGraph(course: CourseRoadmap) {
           description: topic.description,
           duration: topic.estimatedDuration,
           status: topic.status,
+          links: topic.links,
         } satisfies TopicNodeData,
         type: "topic",
       });
@@ -212,8 +232,14 @@ export function RoadmapPage() {
     return buildGraph(course);
   }, [course]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Sync React Flow state when the computed graph changes
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   // -----------------------------------------------------------------------
   // Generating / loading state
@@ -316,27 +342,29 @@ export function RoadmapPage() {
           <p>{course.description}</p>
         </section>
         <div className="roadmap-flow-wrapper">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            defaultEdgeOptions={{
-              animated: false,
-              type: "smoothstep",
-              style: {
-                stroke: "rgba(189, 232, 245, 0.9)",
-                strokeWidth: 2,
-              },
-            }}
-            fitView
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            zoomOnScroll
-            zoomOnPinch
-          >
-            <Background gap={18} size={1} />
-            <Controls showInteractive={true} />
-          </ReactFlow>
+          {nodes && (
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              defaultEdgeOptions={{
+                animated: false,
+                type: "smoothstep",
+                style: {
+                  stroke: "rgba(189, 232, 245, 0.9)",
+                  strokeWidth: 2,
+                },
+              }}
+              fitView
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              zoomOnScroll
+              zoomOnPinch
+            >
+              <Background gap={18} size={1} />
+              <Controls showInteractive={true} />
+            </ReactFlow>
+          )}
         </div>
       </main>
     </div>

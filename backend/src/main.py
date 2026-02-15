@@ -1,5 +1,6 @@
 # Import all necessary modules to register models and routers
 # This ensures that when the app starts, all models and routes are included properly
+import asyncio
 from contextlib import asynccontextmanager
 
 import src.models  # noqa: F401
@@ -12,6 +13,8 @@ from src.core.config import settings
 from src.core.exceptions import setup_exception_handlers
 from src.core.redis import close_redis
 from src.users import routers as user_router
+
+from .engine.entrypoint import _running_tasks
 
 structlog.configure(
     processors=[
@@ -42,6 +45,13 @@ async def lifespan(app: FastAPI):
     # Shutdown: close Redis pool
     await close_redis()
 
+    # --- Shutdown logic goes here ---
+    if _running_tasks:
+        for task in _running_tasks:
+            task.cancel()
+        await asyncio.gather(*_running_tasks, return_exceptions=True)
+        _running_tasks.clear()
+
 
 app = FastAPI(
     title="Proactive Onboarding Engine API",
@@ -51,6 +61,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
 
 # Setup exception handlers
 setup_exception_handlers(app)

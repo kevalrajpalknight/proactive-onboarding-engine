@@ -19,7 +19,6 @@ class OnboardingProfile(TypedDict):
 
 
 def create_onboarding_agent():
-    print("Creating onboarding agent...")
     result = planner_agent.invoke(
         {"messages": [{"role": "user", "content": "What is langgraph?"}]}
     )
@@ -27,7 +26,6 @@ def create_onboarding_agent():
     todo_list_json = [data]  # wrap in a 1‑element list to match your prompt format
 
     for item in todo_list_json:
-        print(f"- Description: {item['description']}, Agent: {item['agent']}")
         if item["agent"] not in ["internet_search_agent", "search_youtube_videos"]:
             print("  [Warning] Unknown agent specified!")
         else:
@@ -37,8 +35,6 @@ def create_onboarding_agent():
             )
 
             data = get_structured_output_parser(research_result)
-
-            print("Research Result:\n", json.dumps(data, indent=2))
 
 
 if __name__ == "__main__":
