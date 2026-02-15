@@ -1,39 +1,45 @@
-import { useMemo } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-    Background,
-    Controls,
-    Handle,
-    Position,
-    ReactFlow,
-    useEdgesState,
-    useNodesState,
-    type Edge,
-    type Node,
-    type NodeProps
-} from 'reactflow'
-import 'reactflow/dist/style.css'
-import type { CourseRoadmap } from '../types/chat'
+  Background,
+  Controls,
+  Handle,
+  Position,
+  ReactFlow,
+  useEdgesState,
+  useNodesState,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "reactflow";
+import "reactflow/dist/style.css";
+import { useRoadmapProgress } from "../hooks/useRoadmapProgress";
+import type { CourseRoadmap } from "../types/chat";
 
+// ---------------------------------------------------------------------------
+// Location state coming from ChatPage
+// ---------------------------------------------------------------------------
 interface RoadmapLocationState {
-  course?: CourseRoadmap
+  course?: CourseRoadmap;
+  /** If true, the roadmap is still being generated — connect WS. */
+  generating?: boolean;
 }
 
 interface CourseNodeData {
-  label: string
-  description?: string
+  label: string;
+  description?: string;
 }
 
 interface SectionNodeData {
-  label: string
-  description?: string
+  label: string;
+  description?: string;
 }
 
 interface TopicNodeData {
-  label: string
-  description?: string
-  duration?: string
-  status: 'not_started' | 'in_progress' | 'completed'
+  label: string;
+  description?: string;
+  duration?: string;
+  status: "not_started" | "in_progress" | "completed";
 }
 
 function CourseNode({ data }: NodeProps<CourseNodeData>) {
@@ -41,9 +47,11 @@ function CourseNode({ data }: NodeProps<CourseNodeData>) {
     <div className="rf-card rf-card-course">
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
       <div className="rf-card-title">{data.label}</div>
-      {data.description && <div className="rf-card-subtitle">{data.description}</div>}
+      {data.description && (
+        <div className="rf-card-subtitle">{data.description}</div>
+      )}
     </div>
-  )
+  );
 }
 
 function SectionNode({ data }: NodeProps<SectionNodeData>) {
@@ -52,9 +60,11 @@ function SectionNode({ data }: NodeProps<SectionNodeData>) {
       <Handle type="target" position={Position.Top} isConnectable={false} />
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
       <div className="rf-card-title">{data.label}</div>
-      {data.description && <div className="rf-card-subtitle">{data.description}</div>}
+      {data.description && (
+        <div className="rf-card-subtitle">{data.description}</div>
+      )}
     </div>
-  )
+  );
 }
 
 function TopicNode({ data }: NodeProps<TopicNodeData>) {
@@ -64,137 +74,226 @@ function TopicNode({ data }: NodeProps<TopicNodeData>) {
       <div className="rf-card-topic-header">
         <div className="rf-card-title rf-card-title--small">{data.label}</div>
         <span className={`rf-card-status rf-card-status--${data.status}`}>
-          {data.status === 'not_started' && 'Not started'}
-          {data.status === 'in_progress' && 'In progress'}
-          {data.status === 'completed' && 'Completed'}
+          {data.status === "not_started" && "Not started"}
+          {data.status === "in_progress" && "In progress"}
+          {data.status === "completed" && "Completed"}
         </span>
       </div>
-      {data.description && <div className="rf-card-subtitle rf-card-subtitle--muted">{data.description}</div>}
+      {data.description && (
+        <div className="rf-card-subtitle rf-card-subtitle--muted">
+          {data.description}
+        </div>
+      )}
       {data.duration && <div className="rf-card-meta">{data.duration}</div>}
     </div>
-  )
+  );
 }
 
 const nodeTypes = {
   course: CourseNode,
   section: SectionNode,
   topic: TopicNode,
-} as const
+} as const;
 
-export function RoadmapPage() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  const location = useLocation()
-  const state = location.state as RoadmapLocationState | null
+// ---------------------------------------------------------------------------
+// Graph builder
+// ---------------------------------------------------------------------------
+function buildGraph(course: CourseRoadmap) {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
 
-  const course = state?.course
+  const courseNodeId = `course-${course.id}`;
+  nodes.push({
+    id: courseNodeId,
+    position: { x: 0, y: 0 },
+    data: {
+      label: course.title,
+      description: course.objective,
+    } satisfies CourseNodeData,
+    type: "course",
+  });
 
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    if (!course) {
-      return { nodes: [], edges: [] }
-    }
+  const sectionSpacingX = 420;
+  const baseSectionY = 150;
 
-    const nodes: Node[] = []
-    const edges: Edge[] = []
+  course.sections.forEach((section, sectionIndex) => {
+    const sectionId = `section-${section.id}`;
+    const sectionX = sectionIndex * sectionSpacingX;
+    const sectionY = baseSectionY;
 
-    const courseNodeId = `course-${course.id}`
     nodes.push({
-      id: courseNodeId,
-      position: { x: 0, y: 0 },
+      id: sectionId,
+      position: { x: sectionX, y: sectionY },
       data: {
-        label: course.title,
-        description: course.objective,
-      } satisfies CourseNodeData,
-      type: 'course',
-    })
+        label: section.title,
+        description: section.description,
+      } satisfies SectionNodeData,
+      type: "section",
+    });
 
-    const sectionSpacingX = 420
-    const baseSectionY = 150
+    edges.push({
+      id: `${courseNodeId}-${sectionId}`,
+      source: courseNodeId,
+      target: sectionId,
+      animated: true,
+    });
 
-    course.sections.forEach((section, sectionIndex) => {
-      const sectionId = `section-${section.id}`
-      const sectionX = sectionIndex * sectionSpacingX
-      const sectionY = baseSectionY
+    const topicSpacingY = 130;
+    const topicBaseY = sectionY + 80;
+
+    section.topics.forEach((topic, topicIndex) => {
+      const topicId = `topic-${topic.id}`;
+      const topicY = topicBaseY + topicIndex * topicSpacingY;
 
       nodes.push({
-        id: sectionId,
-        position: { x: sectionX, y: sectionY },
+        id: topicId,
+        position: { x: sectionX, y: topicY },
         data: {
-          label: section.title,
-          description: section.description,
-        } satisfies SectionNodeData,
-        type: 'section',
-      })
+          label: topic.title,
+          description: topic.description,
+          duration: topic.estimatedDuration,
+          status: topic.status,
+        } satisfies TopicNodeData,
+        type: "topic",
+      });
 
       edges.push({
-        id: `${courseNodeId}-${sectionId}`,
-        source: courseNodeId,
-        target: sectionId,
-        animated: true,
-      })
+        id: `${sectionId}-${topicId}`,
+        source: sectionId,
+        target: topicId,
+      });
+    });
+  });
 
-      const topicSpacingY = 130
-      const topicBaseY = sectionY + 80
+  return { nodes, edges };
+}
 
-      section.topics.forEach((topic, topicIndex) => {
-        const topicId = `topic-${topic.id}`
-        const topicY = topicBaseY + topicIndex * topicSpacingY
+// ---------------------------------------------------------------------------
+// Progress step emojis
+// ---------------------------------------------------------------------------
+const STEP_EMOJIS: Record<string, string> = {
+  analysing_answers: "\u{1F50D}",
+  researching: "\u{1F4DA}",
+  planning: "\u{1F5FA}\uFE0F",
+  generating_roadmap: "\u{2728}",
+  done: "\u{2705}",
+  failed: "\u{274C}",
+};
 
-        nodes.push({
-          id: topicId,
-          position: { x: sectionX, y: topicY },
-          data: {
-            label: topic.title,
-            description: topic.description,
-            duration: topic.estimatedDuration,
-            status: topic.status,
-          } satisfies TopicNodeData,
-          type: 'topic',
-        })
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+export function RoadmapPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const location = useLocation();
+  const locState = location.state as RoadmapLocationState | null;
 
-        edges.push({
-          id: `${sectionId}-${topicId}`,
-          source: sectionId,
-          target: topicId,
-        })
-      })
-    })
+  // The course can come from navigation state OR from the WS once generated
+  const [course, setCourse] = useState<CourseRoadmap | null>(
+    locState?.course ?? null,
+  );
+  const isGenerating = locState?.generating === true && !course;
 
-    return { nodes, edges }
-  }, [course])
+  // Connect to WS only when the roadmap is still being generated
+  const progress = useRoadmapProgress(isGenerating ? (id ?? null) : null);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes)
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges)
+  // When the WS delivers the completed roadmap, store it.
+  // Using queueMicrotask to avoid synchronous setState in effect body.
+  useEffect(() => {
+    if (progress.status === "completed" && progress.roadmap) {
+      queueMicrotask(() => setCourse(progress.roadmap));
+    }
+  }, [progress.status, progress.roadmap]);
 
+  // Build React-Flow graph whenever the course changes
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    if (!course) return { nodes: [], edges: [] };
+    return buildGraph(course);
+  }, [course]);
+
+  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+
+  // -----------------------------------------------------------------------
+  // Generating / loading state
+  // -----------------------------------------------------------------------
   if (!course) {
+    const emoji = STEP_EMOJIS[progress.step] ?? "";
+
     return (
       <div className="roadmap-page">
         <header className="roadmap-header">
           <button
             type="button"
             className="roadmap-back-button"
-            onClick={() => navigate('/chat')}
+            onClick={() => navigate("/chat")}
           >
-            ← Back to chat
+            &larr; Back to chat
           </button>
-          <h1 className="roadmap-title">Roadmap not found</h1>
-          <p className="roadmap-subtitle">
-            We could not find the tailored roadmap for this session.
-          </p>
+          <h1 className="roadmap-title">
+            {progress.status === "error"
+              ? "Something went wrong"
+              : "Curating your roadmap"}
+          </h1>
         </header>
+
+        <main className="roadmap-loading">
+          {progress.status === "error" ? (
+            <div className="roadmap-error">
+              <p>{progress.error ?? "An unexpected error occurred."}</p>
+              <button
+                type="button"
+                className="roadmap-back-button"
+                onClick={() => navigate("/chat")}
+              >
+                Return to chat
+              </button>
+            </div>
+          ) : (
+            <div className="roadmap-progress">
+              {/* Progress bar */}
+              <div className="roadmap-progress-bar-track">
+                <div
+                  className="roadmap-progress-bar-fill"
+                  style={{ width: `${progress.progressPct}%` }}
+                />
+              </div>
+
+              <p className="roadmap-progress-pct">
+                {progress.progressPct}% complete
+              </p>
+
+              {/* Step detail */}
+              <p className="roadmap-progress-detail">
+                {emoji} {progress.detail || "Preparing\u2026"}
+              </p>
+
+              {/* Animated dots to show activity */}
+              <div className="roadmap-progress-dots">
+                <span className="roadmap-dot" />
+                <span className="roadmap-dot" />
+                <span className="roadmap-dot" />
+              </div>
+            </div>
+          )}
+        </main>
       </div>
-    )
+    );
   }
 
+  // -----------------------------------------------------------------------
+  // Roadmap ready
+  // -----------------------------------------------------------------------
   return (
     <div className="roadmap-page">
       <header className="roadmap-header">
         <button
           type="button"
           className="roadmap-back-button"
-          onClick={() => navigate('/chat')}
+          onClick={() => navigate("/chat")}
         >
-          ← Back to chat
+          &larr; Back to chat
         </button>
         <div className="roadmap-header-main">
           <h1 className="roadmap-title">{course.title}</h1>
@@ -203,7 +302,9 @@ export function RoadmapPage() {
         <div className="roadmap-header-meta">
           <span className="roadmap-level">{course.level.toUpperCase()}</span>
           {course.totalEstimatedDuration && (
-            <span className="roadmap-duration">{course.totalEstimatedDuration}</span>
+            <span className="roadmap-duration">
+              {course.totalEstimatedDuration}
+            </span>
           )}
           <span className="roadmap-id">ID: {id ?? course.id}</span>
         </div>
@@ -221,9 +322,9 @@ export function RoadmapPage() {
             nodeTypes={nodeTypes}
             defaultEdgeOptions={{
               animated: false,
-              type: 'smoothstep',
+              type: "smoothstep",
               style: {
-                stroke: 'rgba(189, 232, 245, 0.9)',
+                stroke: "rgba(189, 232, 245, 0.9)",
                 strokeWidth: 2,
               },
             }}
@@ -239,5 +340,5 @@ export function RoadmapPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }

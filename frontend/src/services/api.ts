@@ -142,3 +142,40 @@ export function getChatHistory(
 ): Promise<ChatHistoryResponse> {
   return request(`/chats/${sessionId}/history`);
 }
+
+// ---------------------------------------------------------------------------
+// Roadmap generation API
+// ---------------------------------------------------------------------------
+export interface GenerateRoadmapResponse {
+  session_id: string;
+  status: string;
+  message: string;
+}
+
+export function generateRoadmap(
+  sessionId: string,
+): Promise<GenerateRoadmapResponse> {
+  return request(`/chats/${sessionId}/generate-roadmap`, { method: "POST" });
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the WebSocket URL for roadmap progress streaming.
+ * In development, uses the Vite WS proxy (/ws/...).
+ * In production, resolves relative to the current host.
+ */
+export function getRoadmapWsUrl(sessionId: string): string {
+  const token = getAuthToken() ?? "";
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+  // When VITE_WS_BASE_URL is set, use it directly (production / Docker).
+  // Otherwise fall back to the current host which works with the Vite
+  // dev-server WS proxy.
+  const base =
+    import.meta.env.VITE_WS_BASE_URL ?? `${protocol}://${window.location.host}`;
+
+  return `${base}/ws/roadmap/${sessionId}?token=${encodeURIComponent(token)}`;
+}

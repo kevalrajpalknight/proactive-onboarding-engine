@@ -224,6 +224,22 @@ export function ChatPage() {
               : s,
           ),
         );
+
+        // -----------------------------------------------------------------
+        // When the questionnaire is completed, trigger roadmap generation
+        // and navigate to the roadmap page with a "generating" flag so
+        // that the page connects via WebSocket for live progress.
+        // -----------------------------------------------------------------
+        if (response.completed && sessionId) {
+          try {
+            await api.generateRoadmap(sessionId);
+          } catch {
+            // Best effort — the WebSocket will still attempt to connect
+          }
+          navigate(`/roadmap/${sessionId}`, {
+            state: { generating: true },
+          });
+        }
       } catch (err) {
         if (err instanceof api.ApiError && err.status === 401) {
           logout();
