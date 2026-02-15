@@ -5,49 +5,25 @@ from pydantic import BaseModel, Field
 from ...core.config import settings
 from ...core.utils.ai_core.chains import PydancticLLMChain
 from ..models import Chat
+from ..schema import (
+    ChatHistoryItemSchema,
+    ChatTitleSchema,
+    QuestionnaireQuestionSchema,
+    UserQuerySchema,
+)
 
+MAX_CLARIFYING_QUESTIONS = settings.max_clarifying_questions
 SYSTEM_PROMPT = """
-You are an AI assistant designed to help users with their inquiries through a conversational interface. Your primary goal is to understand the user's needs, existing knowledge about the topic, and the desired outcome they want to achieve. To do this effectively, you will ask a series of clarifying questions before providing any solutions or recommendations.
+You are an AI assistant for conversational inquiries. Your goal is to understand the user's needs, existing knowledge, and desired outcomes by asking clarifying questions.
 
-When interacting with users, follow these guidelines:
-1. Greet the user warmly and introduce yourself as an AI assistant.
-2. Ask open-ended questions to gather information about the user's needs and goals.
-3. Inquire about the user's existing knowledge on the topic to tailor your responses accordingly.
-4. Clarify any ambiguous statements by asking follow-up questions.
-5. Summarize the information gathered to ensure you have a clear understanding of the user's requirements.
-6. Once you have sufficient information, provide well-informed solutions or recommendations that align with the user's goals.
-7. Maintain a friendly and professional tone throughout the conversation.
+Guidelines:
+- Ask open-ended questions to gather information.
+- Ask one question at a time and wait for response.
+- Conclude when you have sufficient information or after {{MAX_CLARIFYING_QUESTIONS}} questions.
+- Maintain a friendly, professional tone.
 
-Termination Criteria:
-- The conversation should conclude when the user indicates that they have received satisfactory assistance or when all their questions have been answered.
-- If 10 consecutive exchanges occur without significant progress toward understanding the user's needs, politely suggest concluding the session.
-
-Remember, your role is to assist the user by first understanding their needs through thoughtful questioning before offering any solutions.
-You must ASK ONLY ONE QUESTION at a time and wait for the user's response before asking the next question.
-
-You will receive user question, answer, chat_history, session_id as input variables.
+Remember: ASK ONLY ONE QUESTION at a time.
 """
-
-
-class ChatTitleSchema(BaseModel):
-    title: str = Field(..., description="The generated title for the chat")
-
-
-class ChatHistoryItemSchema(BaseModel):
-    question: str = Field(..., description="The user's question")
-    answer: str = Field(..., description="The assistant's answer")
-    order: int = Field(
-        ..., description="The order of the interaction in the chat history"
-    )
-
-
-class UserQuerySchema(BaseModel):
-    question: Optional[str] = Field(
-        None, description="The clarifying question generated for the user"
-    )
-    completed: Optional[bool] = Field(
-        False, description="Indicates if no further questions are needed"
-    )
 
 
 class AIService:
@@ -76,7 +52,7 @@ class AIService:
         user_message: str,
         chat_history: list[ChatHistoryItemSchema],
         session_id: str,
-    ) -> str | None:
+    ) -> QuestionnaireQuestionSchema | None:
         prompt_template = (
             SYSTEM_PROMPT
             + """
@@ -91,7 +67,7 @@ class AIService:
         )
 
         chain = PydancticLLMChain(
-            pydantic_model=UserQuerySchema,
+            pydantic_model=QuestionnaireQuestionSchema,
             prompt_template=prompt_template,
             input_variables=[
                 {"name": "chat_history", "type": "list"},
@@ -110,4 +86,8 @@ class AIService:
                 "session_id": session_id,
             }
         )
-        return result["question"] if not result["completed"] else None
+        return (
+            QuestionnaireQuestionSchema(**result)
+            if not result.get("completed")
+            else None
+        )

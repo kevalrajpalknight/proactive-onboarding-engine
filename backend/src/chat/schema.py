@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -34,6 +35,12 @@ class ChatTurnSchema(BaseModel):
             "User's answer to the question. Will be null until the " "user responds."
         ),
     )
+    question_type: Optional[str] = Field(
+        None, description="The type of the question (e.g., 'text', 'multiple_choice')"
+    )
+    options: Optional[List[str]] = Field(
+        None, description="Optional list of predefined answer options for the question"
+    )
 
 
 class ChatSchema(BaseModel):
@@ -67,6 +74,49 @@ class ChatSchema(BaseModel):
     )
 
 
+class ChatTitleSchema(BaseModel):
+    title: str = Field(..., description="The generated title for the chat")
+
+
+class ChatHistoryItemSchema(BaseModel):
+    question: str = Field(..., description="The user's question")
+    answer: str = Field(..., description="The assistant's answer")
+    order: int = Field(
+        ..., description="The order of the interaction in the chat history"
+    )
+    question_type: Optional[str] = Field(
+        None, description="The type of the question (e.g., 'text', 'multiple_choice')"
+    )
+    options: Optional[List[str]] = Field(
+        None, description="Optional list of predefined answer options for the question"
+    )
+
+
+class QuestionType(str, Enum):
+    TEXT = "text"
+    MULTIPLE_CHOICE = "multiple_choice"
+    SINGLE_CHOICE = "single_choice"
+
+
+class QuestionnaireQuestionSchema(BaseModel):
+    order: int = Field(..., description="Order of the question in the questionnaire")
+    question: str = Field(..., description="The clarifying question to ask the user")
+    options: Optional[List[str]] = Field(
+        None, description="Optional list of predefined answer options for the question"
+    )
+    question_type: Optional[QuestionType] = Field(
+        None,
+        description="Type of the question (e.g., 'text', 'multiple_choice', 'single_choice')",
+    )
+    completed: bool = Field(
+        False,
+        description=(
+            "Indicates whether the questionnaire is completed. If true, the "
+            "AI has finished asking questions."
+        ),
+    )
+
+
 class ChatInteractionResponse(BaseModel):
     """Response payload for a single chat interaction.
 
@@ -77,14 +127,25 @@ class ChatInteractionResponse(BaseModel):
     """
 
     session_id: UUID = Field(..., description="Chat session identifier (chat.id)")
+    order: Optional[int] = Field(
+        ..., description="Order of the question in the questionnaire"
+    )
     question: Optional[str] = Field(
+        ..., description="The clarifying question to ask the user"
+    )
+    options: Optional[List[str]] = Field(
+        None, description="Optional list of predefined answer options for the question"
+    )
+    question_type: Optional[QuestionType] = Field(
         None,
-        description=(
-            "Next clarifying question from the AI, or null if the " "flow is complete"
-        ),
+        description="Type of the question (e.g., 'text', 'multiple_choice', 'single_choice')",
     )
     completed: bool = Field(
-        ..., description="True when no further clarifying questions are needed"
+        False,
+        description=(
+            "Indicates whether the questionnaire is completed. If true, the "
+            "AI has finished asking questions."
+        ),
     )
 
 
@@ -98,7 +159,7 @@ class ChatHistoryResponse(BaseModel):
     session_id: UUID = Field(..., description="Chat session identifier (chat.id)")
     title: str = Field(..., description="Title of the chat")
     status: ChatStatus = Field(..., description="Current status of the chat")
-    history: List[ChatTurnSchema] = Field(
+    history: List[ChatHistoryItemSchema] = Field(
         default_factory=list,
         description="Ordered chat turns with question and answer",
     )

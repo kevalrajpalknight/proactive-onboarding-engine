@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     youtube_api_key: str = "YOUR_YOUTUBE_API_KEY"
     openai_api_key: str = "YOUR_OPENAI_API_KEY"
 
+    # Questionaire settings
+    max_clarifying_questions: int = 5
+
     class Config:
         env_file = ".env"
         extra = "allow"

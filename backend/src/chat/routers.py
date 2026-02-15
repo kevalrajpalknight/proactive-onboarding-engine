@@ -7,7 +7,12 @@ from ..auth.dependencies import get_current_user
 from ..core.config import settings
 from ..core.database import get_db
 from .models import ChatStatus
-from .schema import ChatHistoryResponse, ChatInteractionResponse, UserQuerySchema
+from .schema import (
+    ChatHistoryResponse,
+    ChatInteractionResponse,
+    QuestionnaireQuestionSchema,
+    UserQuerySchema,
+)
 from .services import AIService, ChatService
 from .services.ai import ChatHistoryItemSchema
 
@@ -90,19 +95,45 @@ async def chat_interaction(
             answer = item.get("answer") or ""
             order = item.get("order", idx)
 
+            question_type = item.get("question_type", "text")
+            question_options = item.get("options", [])
+            question_text = (
+                question.get("question", question)
+                if isinstance(question, dict)
+                else question
+            )
             chat_history.append(
                 ChatHistoryItemSchema(
-                    question=question,
+                    question=question_text,
                     answer=answer,
                     order=order,
+                    question_type=question_type,
+                    options=question_options,
                 )
             )
 
+    if len(chat_history) >= settings.max_clarifying_questions:
+        await ChatService.update_chat_status(
+            db_session,
+            chat,
+            ChatStatus.COMPLETED,
+        )
+        return ChatInteractionResponse(
+            session_id=chat.id,
+            question="We will tailor the onboarding experience based on your answers. Thank you for providing the information!",
+            completed=True,
+            order=None,
+            options=None,
+            question_type=None,
+        )
+
     # Ask the AI for the next clarifying question (or completion)
-    next_question = await ai_service.generate_clarifying_question(
-        user_message=user_query.message,
-        chat_history=chat_history,
-        session_id=str(chat.id),
+    next_question: QuestionnaireQuestionSchema | None = (
+        await ai_service.generate_clarifying_question(
+            user_message=user_query.message,
+            chat_history=chat_history,
+            session_id=str(chat.id),
+        )
     )
 
     # If the AI signals completion, mark the chat as completed and stop
@@ -116,6 +147,9 @@ async def chat_interaction(
             session_id=chat.id,
             question=None,
             completed=True,
+            order=None,
+            options=None,
+            question_type=None,
         )
 
     # Otherwise, append the new AI question with a null answer (to be
@@ -123,14 +157,23 @@ async def chat_interaction(
     chat = await ChatService.add_question_answer(
         db_session,
         chat,
-        question=next_question,
+        question=next_question.question,
         answer=None,
+        question_type=(
+            next_question.question_type.value if next_question.question_type else "text"
+        ),
+        options=next_question.options,
     )
 
     return ChatInteractionResponse(
         session_id=chat.id,
-        question=next_question,
+        question=next_question.question,
         completed=False,
+        order=next_question.order,
+        options=next_question.options,
+        question_type=(
+            next_question.question_type.value if next_question.question_type else "text"
+        ),
     )
 
 
@@ -165,10 +208,15 @@ async def get_chat_history(
     )
 
     for idx, item in enumerate(turns_sorted, start=1):
-        question = item.get("question")
-        if not question:
+        question_raw = item.get("question")
+        if not question_raw:
             continue
 
+        question = (
+            question_raw.get("question", question_raw)
+            if isinstance(question_raw, dict)
+            else question_raw
+        )
         answer = item.get("answer")
         order = item.get("order", idx)
 

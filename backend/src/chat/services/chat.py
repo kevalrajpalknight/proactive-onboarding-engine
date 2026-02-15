@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..models import Chat, ChatStatus
 
@@ -61,13 +62,22 @@ class ChatService:
         chat: Chat,
         question: str,
         answer: str | None,
+        question_type: str = "text",
+        options: list[str] | None = None,
     ) -> Chat:
         if chat.question_answers is None:
             chat.question_answers = []
         order = len(chat.question_answers) + 1
         chat.question_answers.append(
-            {"order": order, "question": question, "answer": answer}
+            {
+                "order": order,
+                "question": question,
+                "answer": answer,
+                "question_type": question_type,
+                "options": options,
+            }
         )
+        flag_modified(chat, "question_answers")
         db_session.add(chat)
         await db_session.commit()
         await db_session.refresh(chat)
