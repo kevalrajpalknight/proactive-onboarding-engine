@@ -57,6 +57,7 @@ async def roadmap_progress_ws(
     redis = get_redis()
     pubsub = None
 
+    pubsub_key = roadmap_channel(session_id)
     try:
         # Send cached state (reconnection support)
         cached_raw = await redis.get(roadmap_state_key(session_id))
@@ -68,7 +69,7 @@ async def roadmap_progress_ws(
 
         # Subscribe to real-time channel
         pubsub = redis.pubsub()
-        await pubsub.subscribe(roadmap_channel(session_id))
+        await pubsub.subscribe(pubsub_key)
 
         async for message in pubsub.listen():
             if message["type"] != "message":
@@ -87,7 +88,7 @@ async def roadmap_progress_ws(
 
             # If the engine signals completion, close gracefully
             if payload_data.get("status") == "completed":
-                await pubsub.unsubscribe(roadmap_channel(session_id))
+                await pubsub.unsubscribe(pubsub_key)
                 break
 
     except WebSocketDisconnect:
@@ -108,7 +109,7 @@ async def roadmap_progress_ws(
     finally:
         if pubsub is not None:
             try:
-                await pubsub.unsubscribe(roadmap_channel(session_id))
+                await pubsub.unsubscribe(pubsub_key)
                 await pubsub.aclose()
             except Exception:
                 pass

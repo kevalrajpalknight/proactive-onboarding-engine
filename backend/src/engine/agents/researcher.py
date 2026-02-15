@@ -2,11 +2,12 @@ from enum import Enum
 
 from deepagents import create_deep_agent
 from langchain.agents.structured_output import ToolStrategy
-from models.llm import llm
-from prompts.research_prompt import get_research_prompt
 from pydantic import BaseModel
-from tools.ddgs import search
-from tools.youtube import search_youtube_videos
+
+from ..models.llm import llm
+from ..prompts.research_prompt import get_research_prompt
+from ..tools.ddgs import search
+from ..tools.youtube import search_youtube_videos
 
 
 class ResourceType(str, Enum):

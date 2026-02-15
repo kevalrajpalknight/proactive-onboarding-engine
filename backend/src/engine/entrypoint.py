@@ -13,6 +13,7 @@ can wire it up to the planner + researcher agents incrementally.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -75,80 +76,6 @@ async def _publish_progress(
     await redis.publish(roadmap_channel(session_id), raw)
 
 
-# ---------------------------------------------------------------------------
-# Stub roadmap builder — replace internals with real agent orchestration
-# ---------------------------------------------------------------------------
-
-
-def _build_stub_roadmap(session_id: str, chat_data: dict[str, Any]) -> dict[str, Any]:
-    """Return a placeholder roadmap structure.
-
-    Replace this with real planner/researcher agent calls once the
-    engine pipeline is wired up.
-    """
-    roadmap_id = str(uuid.uuid4())
-    return {
-        "id": roadmap_id,
-        "session_id": session_id,
-        "title": chat_data.get("title", "Your Tailored Learning Roadmap"),
-        "objective": "Master the topics identified during onboarding",
-        "description": (
-            "A personalised learning path curated from your onboarding answers."
-        ),
-        "level": "beginner",
-        "totalEstimatedDuration": "4 weeks",
-        "sections": [
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Getting Started",
-                "description": "Foundational concepts to kick things off.",
-                "topics": [
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": "Introduction & Setup",
-                        "description": "Environment setup and first steps.",
-                        "status": "not_started",
-                        "estimatedDuration": "1 hour",
-                    },
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": "Core Concepts",
-                        "description": "Understand the fundamental building blocks.",
-                        "status": "not_started",
-                        "estimatedDuration": "2 hours",
-                    },
-                ],
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Deep Dive",
-                "description": "Hands-on practice with real-world examples.",
-                "topics": [
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": "Practical Exercises",
-                        "description": "Apply what you have learnt so far.",
-                        "status": "not_started",
-                        "estimatedDuration": "3 hours",
-                    },
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": "Advanced Patterns",
-                        "description": "Go beyond the basics.",
-                        "status": "not_started",
-                        "estimatedDuration": "2 hours",
-                    },
-                ],
-            },
-        ],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Main entrypoint
-# ---------------------------------------------------------------------------
-
-
 async def curate_roadmap(session_id: str, chat_data: dict[str, Any]) -> None:
     """Orchestrate roadmap curation and publish progress via Redis.
 
@@ -163,7 +90,6 @@ async def curate_roadmap(session_id: str, chat_data: dict[str, Any]) -> None:
         Dictionary with at least ``title``, ``initial_message``, and
         ``question_answers`` from the Chat model.
     """
-    import asyncio
 
     logger.info("roadmap_curation_started", session_id=session_id)
 
@@ -208,12 +134,6 @@ async def curate_roadmap(session_id: str, chat_data: dict[str, Any]) -> None:
         )
         await asyncio.sleep(1)  # simulate work
 
-        # ------------------------------------------------------------------
-        # TODO: Replace stub with real agent orchestration
-        #   roadmap = await run_planner_and_researcher(chat_data)
-        # ------------------------------------------------------------------
-        roadmap = _build_stub_roadmap(session_id, chat_data)
-
         # Step 5 — Done
         await _publish_progress(
             session_id,
@@ -221,7 +141,10 @@ async def curate_roadmap(session_id: str, chat_data: dict[str, Any]) -> None:
             step="done",
             detail="Your roadmap is ready!",
             progress_pct=100,
-            roadmap=roadmap,
+            roadmap={
+                "title": f"Roadmap for {chat_data['title']}",
+                "courses": [],
+            },
         )
 
         logger.info("roadmap_curation_completed", session_id=session_id)
