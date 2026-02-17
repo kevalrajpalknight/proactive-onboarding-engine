@@ -58,10 +58,24 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_password: str | None = None
 
+    # ChromaDB settings
+    chroma_host: str = "localhost"
+    chroma_port: int = 8100
+    chroma_collection_name: str = "company_policies"
+
+    # RAG settings
+    rag_data_dir: str = "rag_data"
+    rag_chunk_size: int = 1000
+    rag_chunk_overlap: int = 200
+
     @property
     def redis_url(self) -> str:
         auth = f":{self.redis_password}@" if self.redis_password else ""
         return f"redis://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def chroma_url(self) -> str:
+        return f"http://{self.chroma_host}:{self.chroma_port}"
 
     # Questionaire settings
     max_clarifying_questions: int = 5

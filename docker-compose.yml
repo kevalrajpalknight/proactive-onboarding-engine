@@ -23,6 +23,18 @@ services:
     volumes:
       - poe_redis_data:/data
 
+  chromadb:
+    image: chromadb/chroma:0.6.3
+    container_name: poe_chromadb
+    restart: unless-stopped
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    ports:
+      - "8100:8000"
+    volumes:
+      - poe_chroma_data:/chroma/chroma
+
   backend:
     build:
       context: ./backend
@@ -31,6 +43,7 @@ services:
     depends_on:
       - db
       - redis
+      - chromadb
     env_file:
       - ./backend/.env
     ports:
@@ -39,3 +52,4 @@ services:
 volumes:
   poe_db_data:
   poe_redis_data:
+  poe_chroma_data:

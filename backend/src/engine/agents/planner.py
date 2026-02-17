@@ -11,6 +11,7 @@ from ..prompts.planner_prompt import get_planner_prompt
 class AgentType(str, Enum):
     internet_search_agent = "internet_search_agent"
     search_youtube_videos = "search_youtube_videos"
+    company_policy_search = "company_policy_search"
 
 
 class ToDoListResponseFormat(BaseModel):

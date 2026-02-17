@@ -22,6 +22,7 @@ import structlog
 from ..core.redis import get_redis, roadmap_channel, roadmap_state_key
 from .agents import (
     planner_agent,
+    policy_researcher_agent,
     post_process_roadmap,
     researcher_agent,
     roadmap_creator_agent,
@@ -170,6 +171,63 @@ async def curate_roadmap(session_id: str, chat_data: dict[str, Any]) -> None:
             ex=3600,
         )
 
+        # Step 2b — Policy research (RAG) for company-policy items
+        # Extract policy-related items from the planner output and run
+        # the policy researcher agent in parallel with the internet researcher.
+        policy_result_serializable: dict[str, Any] | None = None
+        try:
+            structured = planner_result_serializable.get("structured_response", {})
+            # structured_response may be a list or a single dict depending
+            # on the planner output format
+            todo_items: list[dict[str, Any]] = []
+            if isinstance(structured, list):
+                todo_items = structured
+            elif isinstance(structured, dict) and "items" in structured:
+                todo_items = structured["items"]
+
+            # Check if any planner item targets company_policy_search
+            policy_items = [
+                item
+                for item in todo_items
+                if isinstance(item, dict)
+                and item.get("agent") == "company_policy_search"
+            ]
+
+            if policy_items:
+                await _publish_progress(
+                    session_id,
+                    status="in_progress",
+                    step="policy_research",
+                    detail="Searching company policy documents…",
+                    progress_pct=40,
+                )
+                policy_query = json.dumps(
+                    {"chat_data": chat_data, "policy_items": policy_items}
+                )
+                policy_result = await loop.run_in_executor(
+                    None,
+                    lambda: policy_researcher_agent.invoke(
+                        {"messages": [{"role": "user", "content": policy_query}]}
+                    ),
+                )
+                policy_result_serializable = _serialize_agent_result(policy_result)
+                logger.info(
+                    "policy_research_result",
+                    session_id=session_id,
+                    result=policy_result_serializable,
+                )
+                await redis.set(
+                    f"policy_result:{session_id}",
+                    json.dumps(policy_result_serializable),
+                    ex=3600,
+                )
+        except Exception as policy_exc:
+            logger.warning(
+                "policy_research_skipped",
+                session_id=session_id,
+                reason=str(policy_exc),
+            )
+
         # Step 3 — Planning
         await _publish_progress(
             session_id,
@@ -219,6 +277,11 @@ async def curate_roadmap(session_id: str, chat_data: dict[str, Any]) -> None:
             {
                 "chat_data": chat_data,
                 "researcher_output": researcher_result_serializable,
+                **(
+                    {"policy_research": policy_result_serializable}
+                    if policy_result_serializable
+                    else {}
+                ),
             }
         )
         roadmap_raw = await loop.run_in_executor(

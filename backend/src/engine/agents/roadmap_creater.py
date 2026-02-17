@@ -21,7 +21,7 @@ class RoadmapTopicFormat(BaseModel):
     title: str
     description: str
     estimatedDuration: str
-    links: List[str] | None = None
+    links: List[str]
 
 
 class RoadmapSectionFormat(BaseModel):

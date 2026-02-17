@@ -259,3 +259,4 @@ dist-ssr
 *.sln
 *.sw?
 temp
+rag_data
